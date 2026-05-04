@@ -23,9 +23,9 @@
 </template>
 
 <script setup>
-// 导入Vue核心功能
+// 导入Vue核心功能 nextTick 等待DOM更新完成
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-// 导入Element Plus加载组件
+// 导入Element Plus加载组件 等待地图加载完成
 import { ElLoading } from 'element-plus'
 // 导入Element Plus图标
 import { Location, Plus, Minus, Aim } from '@element-plus/icons-vue'
@@ -33,12 +33,16 @@ import { Location, Plus, Minus, Aim } from '@element-plus/icons-vue'
 import Map from 'ol/Map'
 import View from 'ol/View'
 import TileLayer from 'ol/layer/Tile'
+// VectorLayer 矢量图层
 import VectorLayer from 'ol/layer/Vector'
+// VectorSource 矢量数据源
 import VectorSource from 'ol/source/Vector'
 import OSM from 'ol/source/OSM'
 import { Style, Circle, Fill, Stroke, Text } from 'ol/style'
 import { Point } from 'ol/geom'
 import { Feature } from 'ol'
+// toLonLat 转换为地图坐标
+// fromLonLat 转换为经纬度坐标
 import { fromLonLat, toLonLat } from 'ol/proj'
 // 导入地理编码工具
 import { reverseGeocode } from '@/utils/geocode'
@@ -137,7 +141,7 @@ function initMap() {
     controls: [], // 禁用默认控件
     view: new View({
       center: fromLonLat(props.center), // 转换为地图坐标
-      zoom: props.zoom
+      zoom: props.zoom // 初始缩放级别
     })
   })
 
@@ -226,13 +230,15 @@ function setMarker(lng, lat) {
 // 缩放控制
 function zoomIn() {
   if (map) {
+    // getView 获取当前视图对象
+    // setZoom 设置缩放级别
     const view = map.getView()
     view.setZoom(view.getZoom() + 1)
   }
 }
 
 function zoomOut() {
-  if (map) {
+  if (map) {    
     const view = map.getView()
     view.setZoom(view.getZoom() - 1)
   }

@@ -4,6 +4,7 @@
       <div class="header-left">
         <router-link to="/" class="logo">
           <el-icon :size="28"><Bicycle /></el-icon>
+          <!-- Bicycle 图标：骑行 -->
           <span>骑行智慧民生</span>
         </router-link>
       </div>
@@ -12,6 +13,7 @@
         <router-link to="/home" class="nav-item" :class="{ active: $route.path === '/home' }">
           <el-icon><HomeFilled /></el-icon>
           <span>首页</span>
+          <!-- HomeFilled 图标：首页 -->
         </router-link>
         <router-link to="/report" class="nav-item" :class="{ active: $route.path === '/report' }">
           <el-icon><Warning /></el-icon>

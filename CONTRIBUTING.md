@@ -152,7 +152,6 @@ Closes #123
 如果您有任何问题或需要帮助，可以通过以下方式联系我们：
 
 - GitHub Issues: https://github.com/hyxvs/Smart-riding/issues
-- 邮箱: 2933365269@qq.com
 
 ---
 

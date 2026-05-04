@@ -59,13 +59,13 @@ function getCacheConfig(url) {
 request.interceptors.request.use(
   config => {
     // 从本地存储获取token
-    const token = localStorage.getItem('token')
-    // 如果存在token，添加到请求头
+    const token = localStorage.getItem("token")
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
 
     // GET 请求尝试从缓存获取
+    // toLowerCase() 确保方法名是小写
     if (config.method?.toLowerCase() === 'get') {
       const cacheCfg = getCacheConfig(config.url)
       if (cacheCfg) {
@@ -111,8 +111,10 @@ request.interceptors.response.use(
 
     // 缓存成功的 GET 响应
     if (config.method?.toLowerCase() === 'get' && res.code === 200) {
+      // getCacheConfig() 检查是否需要缓存
       const cacheCfg = getCacheConfig(config.url)
       if (cacheCfg && !config.adapter) { // 不是从缓存返回的
+        // generateCacheKey() 生成缓存key
         const cacheKey = generateCacheKey(config)
         apiCache.set(cacheKey, res, cacheCfg.ttl)
       }

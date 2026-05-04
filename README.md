@@ -336,8 +336,7 @@ MIT License
 ## 联系方式
 
 - 项目地址: https://github.com/hyxvs/Smart-riding.git
-- 作者: huangyuxuan
-- 邮箱: 2933365269@qq.com
+- 欢迎通过 GitHub Issues 联系我们
 
 ---
 

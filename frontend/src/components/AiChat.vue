@@ -21,6 +21,18 @@
           </div>
           <div class="message-content">
             <div class="message-text">{{ msg.content }}</div>
+            <WeatherCard
+              v-if="msg.weather"
+              class="message-weather"
+              :data="msg.weather"
+            />
+            <TripPlanCard
+              v-if="msg.tripPlan"
+              class="message-trip"
+              :plan="msg.tripPlan"
+              :visible="true"
+              @view-details="handleViewTripDetails"
+            />
           </div>
         </div>
         
@@ -76,6 +88,8 @@ import { ref, watch, nextTick } from 'vue'
 import { aiApi } from '@/api'
 // 导入用户状态管理
 import { useUserStore } from '@/stores/user'
+import WeatherCard from '@/components/WeatherCard.vue'
+import TripPlanCard from '@/components/TripPlanCard.vue'
 
 // 定义组件属性
 const props = defineProps({
@@ -104,8 +118,10 @@ const sessionId = ref('')
 const quickQuestions = [
   '如何规划骑行路线？',
   '附近有哪些红色景点？',
+  '赣州今天天气怎么样？',
   '如何上报道路问题？',
-  '骑行安全注意事项'
+  '骑行安全注意事项',
+  '我想去赣州骑行3天，喜欢历史文化，预算500元'
 ]
 
 // 监听外部控制抽屉显示/隐藏
@@ -144,7 +160,12 @@ async function sendMessage() {
       // 更新会话ID
       sessionId.value = res.data.sessionId
       // 添加AI回复到列表
-      messages.value.push({ role: 'assistant', content: res.data.response })
+      messages.value.push({
+        role: 'assistant',
+        content: res.data.response,
+        weather: res.data.weather || null,
+        tripPlan: res.data.tripPlan || null
+      })
     }
   } catch {
     // 错误处理
@@ -155,6 +176,11 @@ async function sendMessage() {
     // 滚动到底部
     scrollToBottom()
   }
+}
+
+// 查看行程详情
+function handleViewTripDetails(plan) {
+  console.log('查看行程详情:', plan)
 }
 
 // 发送快速问题
@@ -222,6 +248,7 @@ function scrollToBottom() {
       display: flex;
       flex-direction: column;
       margin: 0 10px;
+      gap: 8px;
       
       .message-text {
         max-width: 260px;
@@ -249,6 +276,10 @@ function scrollToBottom() {
       }
     }
   }
+}
+
+.message-weather {
+  max-width: 280px;
 }
 
 /* 加载动画 */

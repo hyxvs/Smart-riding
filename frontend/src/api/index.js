@@ -1,5 +1,6 @@
 // 导入Axios请求实例
 import request from './request'
+import { weatherApi } from './weather'
 
 // 认证相关API
 export const authApi = {
@@ -21,7 +22,6 @@ export const userApi = {
   uploadAvatar: (data) => request.post('/user/avatar', data), // 上传头像
   getRoutes: (params) => request.get('/user/routes', { params }), // 获取用户路线
   createRoute: (data) => request.post('/user/routes', data), // 创建用户路线
-  getDiaries: (params) => request.get('/user/diaries', { params }), // 获取用户日记
   getReports: (params) => request.get('/user/reports', { params }), // 获取用户上报
   getStats: () => request.get('/user/stats') // 获取用户统计数据
 }
@@ -111,4 +111,25 @@ export const adminApi = {
 export const analysisApi = {
   calculateIsochrone: (data) => request.post('/analysis/isochrone', data), // 计算等时圈
   getIsochroneHistory: (params) => request.get('/analysis/isochrone/history', { params }) // 获取等时圈历史
+}
+
+// 天气相关API
+export { weatherApi }
+
+// 行程规划API
+export const tripApi = {
+  create: (data) => request.post('/trip/create', data), // 创建行程规划
+  getList: (params) => request.get('/trip/list', { params }), // 获取行程规划列表
+  getDetail: (id) => request.get(`/trip/${id}`), // 获取行程规划详情
+  update: (id, data) => request.put(`/trip/${id}`, data), // 更新行程规划
+  delete: (id) => request.delete(`/trip/${id}`) // 删除行程规划
+}
+
+// 智能路况分析API
+export const roadConditionApi = {
+  analyzeRoad: (data) => request.post('/road-condition/analyze-road', data), // 分析道路
+  predictTraffic: (data) => request.post('/road-condition/predict-traffic', data), // 预测交通
+  getWeatherRoadImpact: (data) => request.post('/road-condition/weather-road-impact', data), // 天气路况影响
+  analyzeRoute: (data) => request.post('/road-condition/route-analysis', data), // 路线分析
+  getRoadCondition: (roadId, params) => request.get(`/road-condition/${roadId}`, { params }) // 获取路况
 }

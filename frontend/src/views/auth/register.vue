@@ -99,7 +99,7 @@ async function handleRegister() {
       ElMessage.error(res.message || '注册失败')
     }
   } catch (e) {
-    ElMessage.error('注册失败')
+    ElMessage.error(e.message || '注册失败')
   } finally {
     loading.value = false
   }

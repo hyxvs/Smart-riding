@@ -10,7 +10,7 @@ set DB_HOST=localhost
 set DB_PORT=5432
 set DB_NAME=cycling_smart
 set DB_USER=postgres
-set DB_PASSWORD=123456
+set DB_PASSWORD=%DB_PASSWORD%
 
 REM 设置文件路径
 set DEM_FILE=c:\Users\hyx\Desktop\项目\骑行智慧民生服务平台\data\章贡区.tif

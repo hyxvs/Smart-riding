@@ -129,6 +129,10 @@ function locateMe() {
   })
   
   // 获取当前位置
+  // navigator.geolocation.getCurrentPosition 获取当前位置
+  // 成功回调函数：定位成功时调用
+  // 失败回调函数：定位失败时调用
+  // 选项对象：配置定位参数
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       loadingMessage.close()

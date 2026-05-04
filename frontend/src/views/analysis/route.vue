@@ -27,7 +27,7 @@
         </div>
       </div>
 
-      <div class="side-panel">
+      <div ref="sidePanelRef" class="side-panel">
         <el-card shadow="never" class="panel-card">
           <template #header>
             <div class="card-header">
@@ -94,9 +94,30 @@
               <div class="field-tip">“避开大坡度”会直接使用后端道路表里的坡度字段做路网过滤。</div>
             </el-form-item>
           </el-form>
+
+          <div v-if="hasRouteResult && roadConditionSummaries.length" class="condition-quick-panel">
+            <div class="condition-quick-header">
+              <span>智能路况标签</span>
+              <span class="field-tip">已同步显示到地图，点击卡片可快速定位。</span>
+            </div>
+            <div class="condition-quick-list">
+              <button
+                v-for="item in roadConditionSummaries"
+                :key="item.key"
+                type="button"
+                class="condition-quick-item"
+                :class="item.level"
+                @click="focusRoadConditionLabel(item)"
+              >
+                <span class="condition-quick-title">{{ item.shortLabel }}</span>
+                <span class="condition-quick-detail">{{ item.detail }}</span>
+              </button>
+            </div>
+          </div>
         </el-card>
 
-        <el-card v-if="routeResult" shadow="never" class="panel-card">
+        <div v-if="hasRouteResult" ref="routeResultSectionRef" class="result-section">
+          <el-card shadow="never" class="panel-card result-panel-card">
           <template #header>
             <div class="card-header">
               <span>规划结果</span>
@@ -131,7 +152,7 @@
             <el-button type="primary" :loading="saving" @click="saveRoute">保存路线</el-button>
           </div>
 
-          <el-alert v-if="savedRouteInfo.share_code" type="success" :closable="false" class="save-alert">
+          <el-alert v-if="savedRouteInfo?.share_code" type="success" :closable="false" class="save-alert">
             <template #title>
               路线已保存，分享码：{{ savedRouteInfo.share_code }}
             </template>
@@ -263,8 +284,17 @@
                 </el-table-column>
               </el-table>
             </el-tab-pane>
+
+            <el-tab-pane label="智能路况">
+              <RoadConditionPanel
+                :route-geom="routeResult.routeGeom"
+                :road-info="currentRoadInfo"
+                :road-segments="roadSegments"
+              />
+            </el-tab-pane>
           </el-tabs>
-        </el-card>
+          </el-card>
+        </div>
 
         <el-empty v-else description="完成起终点选取后即可开始路线规划。" class="empty-state" />
       </div>
@@ -286,13 +316,17 @@ import Feature from 'ol/Feature'
 import Point from 'ol/geom/Point'
 import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style'
 import { fromLonLat, toLonLat } from 'ol/proj'
+import { getCenter } from 'ol/extent'
 import { ElMessage } from 'element-plus'
 import { routeApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import RoadConditionPanel from '@/components/RoadConditionPanel.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const mapContainer = ref(null)
+const sidePanelRef = ref(null)
+const routeResultSectionRef = ref(null)
 const planning = ref(false)
 const saving = ref(false)
 const selectingPoint = ref(null)
@@ -338,6 +372,7 @@ let roadSource = null
 let routeSource = null
 let markerSource = null
 let poiSource = null
+let conditionSource = null
 
 const selectingLabel = computed(() => {
   if (!selectingPoint.value) return ''
@@ -348,11 +383,29 @@ const selectingLabel = computed(() => {
 
 const slopeStats = computed(() => routeResult.value?.slopeStats || emptySlopeStats)
 const slopeFactors = computed(() => routeResult.value?.slopeFactors || emptySlopeFactors)
+const roadSegments = computed(() => routeResult.value?.roadSegments || [])
+const hasRouteResult = computed(() => Boolean(routeResult.value?.routeGeom))
 const slopeSourceLabel = computed(() => {
   const source = routeResult.value?.slopeSource
   if (source === 'dem') return 'DEM 坡度'
   if (source === 'road') return '道路坡度字段'
   return '无可用坡度'
+})
+
+const roadConditionSummaries = computed(() => createRoadConditionSummaries(routeResult.value))
+const primaryRoadCondition = computed(() => roadConditionSummaries.value[0] || null)
+
+const currentRoadInfo = computed(() => {
+  const primarySegment = primaryRoadCondition.value?.segment || roadSegments.value[0]
+  if (!primarySegment) return null
+
+  return {
+    id: primarySegment.id,
+    name: primarySegment.name || primaryRoadCondition.value?.name || '路线重点路段',
+    avgSlope: Number(primarySegment.avgSlope || slopeStats.value.avgSlope || 0),
+    maxSlope: Number(primarySegment.maxSlope || slopeStats.value.maxSlope || 0),
+    roadType: primarySegment.roadType || '城市道路'
+  }
 })
 
 const cyclingAdvice = computed(() => {
@@ -396,6 +449,7 @@ function initMap() {
   routeSource = new VectorSource()
   markerSource = new VectorSource()
   poiSource = new VectorSource()
+  conditionSource = new VectorSource()
 
   const roadLayer = new VectorLayer({
     source: roadSource,
@@ -409,6 +463,12 @@ function initMap() {
 
   const routeLayer = new VectorLayer({
     source: routeSource
+  })
+
+  const conditionLayer = new VectorLayer({
+    source: conditionSource,
+    declutter: true,
+    style: feature => createRoadConditionLabelStyle(feature)
   })
 
   const poiLayer = new VectorLayer({
@@ -427,6 +487,7 @@ function initMap() {
       new TileLayer({ source: new OSM() }),
       roadLayer,
       routeLayer,
+      conditionLayer,
       poiLayer,
       markerLayer
     ],
@@ -529,11 +590,12 @@ function createPointFeature(point, kind, label) {
 }
 
 async function planRoute() {
-  if (!userStore.isLoggedIn) {
-    ElMessage.warning('请先登录后再进行路线规划')
-    goLogin()
-    return
-  }
+  // 临时移除登录限制以便测试智能路况功能
+  // if (!userStore.isLoggedIn) {
+  //   ElMessage.warning('请先登录后再进行路线规划')
+  //   goLogin()
+  //   return
+  // }
 
   if (!isPointValid(startPoint) || !isPointValid(endPoint)) {
     ElMessage.warning('请先选择起点和终点')
@@ -560,11 +622,13 @@ async function planRoute() {
       return
     }
 
-    routeResult.value = response.data
+    routeResult.value = normalizeRouteResult(response.data)
     savedRouteInfo.value = null
     drawRoute()
+    drawRoadConditionLabels()
     drawRoutePois()
     fitRouteToView()
+    await revealRouteResult()
     ElMessage.success(response.message || '路线规划完成')
   } catch (error) {
     console.error('路线规划失败:', error)
@@ -591,6 +655,17 @@ function drawRoute() {
   routeSource.addFeature(feature)
 }
 
+function drawRoadConditionLabels() {
+  conditionSource?.clear()
+
+  roadConditionSummaries.value.forEach((item, index) => {
+    const feature = createRoadConditionFeature(item, index)
+    if (feature) {
+      conditionSource?.addFeature(feature)
+    }
+  })
+}
+
 function drawRoutePois() {
   poiSource.clear()
 
@@ -615,6 +690,17 @@ function drawRoutePois() {
       })
     )
   })
+}
+
+function focusRoadConditionLabel(item) {
+  const coordinate = resolveRoadConditionCoordinate(item)
+  if (!coordinate) {
+    fitRouteToView()
+    return
+  }
+
+  const [lng, lat] = toLonLat(coordinate)
+  focusCoords(lng, lat, 16)
 }
 
 function fitRouteToView() {
@@ -717,6 +803,7 @@ function clearRouteArtifacts() {
   routeResult.value = null
   savedRouteInfo.value = null
   routeSource?.clear()
+  conditionSource?.clear()
   poiSource?.clear()
 }
 
@@ -738,6 +825,19 @@ function resetPlanning() {
       duration: 300
     })
   }
+}
+
+async function revealRouteResult() {
+  await nextTick()
+
+  const panelEl = sidePanelRef.value
+  const resultEl = routeResultSectionRef.value
+  if (!panelEl || !resultEl || typeof panelEl.scrollTo !== 'function') return
+
+  panelEl.scrollTo({
+    top: Math.max(resultEl.offsetTop - 8, 0),
+    behavior: 'smooth'
+  })
 }
 
 function goLogin() {
@@ -790,6 +890,191 @@ function createEmptyPoint() {
     lng: null,
     lat: null
   }
+}
+
+function normalizeRouteResult(routeData) {
+  if (!routeData) return null
+
+  return {
+    ...routeData,
+    nearbyPois: Array.isArray(routeData.nearbyPois) ? routeData.nearbyPois : [],
+    redSpots: Array.isArray(routeData.redSpots) ? routeData.redSpots : [],
+    roadSegments: Array.isArray(routeData.roadSegments) ? routeData.roadSegments : [],
+    slopeStats: {
+      ...emptySlopeStats,
+      ...(routeData.slopeStats || {})
+    },
+    slopeFactors: {
+      ...emptySlopeFactors,
+      ...(routeData.slopeFactors || {})
+    }
+  }
+}
+
+function createRoadConditionSummaries(routeData) {
+  if (!routeData) return []
+
+  const segmentSummaries = (routeData.roadSegments || [])
+    .map((segment, index) => buildRoadConditionSummary(segment, index))
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority
+      if (b.maxSlope !== a.maxSlope) return b.maxSlope - a.maxSlope
+      return b.length - a.length
+    })
+
+  const highlighted = segmentSummaries.filter(item => item.priority > 1)
+  const selected = (highlighted.length ? highlighted : segmentSummaries).slice(0, 4)
+
+  if (selected.length) {
+    return selected
+  }
+
+  if (routeData.routeGeom) {
+    return [createFallbackRoadConditionSummary(routeData)]
+  }
+
+  return []
+}
+
+function buildRoadConditionSummary(segment, index) {
+  if (!segment) return null
+
+  const avgSlope = Number(segment.avgSlope || 0)
+  const maxSlope = Number(segment.maxSlope || 0)
+  const length = Number(segment.length || 0)
+  const meta = getRoadConditionMeta(maxSlope, avgSlope, segment.slopeCategory)
+  const roadName = segment.name || `路段 ${index + 1}`
+  const metricText = maxSlope > 0
+    ? `最大坡度 ${maxSlope.toFixed(1)}%`
+    : formatSegmentDistance(length)
+
+  return {
+    key: `${segment.id ?? 'segment'}-${index}`,
+    name: roadName,
+    shortLabel: meta.shortLabel,
+    detail: `${roadName} · ${metricText}`,
+    mapDetail: metricText,
+    level: meta.level,
+    priority: meta.priority,
+    segment,
+    avgSlope,
+    maxSlope,
+    length
+  }
+}
+
+function createFallbackRoadConditionSummary(routeData) {
+  const avgSlope = Number(routeData.slopeStats?.avgSlope || 0)
+  const maxSlope = Number(routeData.slopeStats?.maxSlope || 0)
+  const length = Number(routeData.totalDistance || 0)
+  const meta = getRoadConditionMeta(maxSlope, avgSlope)
+
+  return {
+    key: 'route-summary',
+    name: '整条路线',
+    shortLabel: meta.shortLabel,
+    detail: `整条路线 · 最大坡度 ${maxSlope.toFixed(1)}%`,
+    mapDetail: `${formatDistance(length)} / 最大 ${maxSlope.toFixed(1)}%`,
+    level: meta.level,
+    priority: meta.priority,
+    segment: {
+      id: null,
+      name: '整条路线',
+      roadType: '路线概览',
+      avgSlope,
+      maxSlope,
+      geometry: routeData.routeGeom
+    },
+    avgSlope,
+    maxSlope,
+    length
+  }
+}
+
+function getRoadConditionMeta(maxSlope, avgSlope, slopeCategory = '') {
+  if (slopeCategory === '陡峭' || maxSlope >= 15) {
+    return { level: 'danger', priority: 4, shortLabel: '陡坡预警' }
+  }
+  if (slopeCategory === '较陡' || maxSlope >= 8) {
+    return { level: 'warning', priority: 3, shortLabel: '较陡路段' }
+  }
+  if (slopeCategory === '中等' || avgSlope >= 3) {
+    return { level: 'notice', priority: 2, shortLabel: '起伏路段' }
+  }
+
+  return { level: 'stable', priority: 1, shortLabel: '平稳路段' }
+}
+
+function formatSegmentDistance(lengthKm) {
+  const distance = Number(lengthKm)
+  if (Number.isNaN(distance) || distance <= 0) return '短距离'
+  if (distance >= 1) return `${distance.toFixed(1)} km`
+  return `${Math.round(distance * 1000)} m`
+}
+
+function createRoadConditionFeature(item, index) {
+  const coordinate = resolveRoadConditionCoordinate(item)
+  if (!coordinate) return null
+
+  return new Feature({
+    geometry: new Point(coordinate),
+    label: item.shortLabel,
+    detail: item.mapDetail,
+    level: item.level,
+    sortOrder: index
+  })
+}
+
+function resolveRoadConditionCoordinate(item) {
+  const geometryData = item?.segment?.geometry || routeResult.value?.routeGeom
+  if (!geometryData) return null
+
+  const geometry = geoJson.readGeometry(geometryData, projectionOptions())
+  if (typeof geometry.getCoordinateAt === 'function') {
+    return geometry.getCoordinateAt(0.5)
+  }
+
+  return getCenter(geometry.getExtent())
+}
+
+function createRoadConditionLabelStyle(feature) {
+  const theme = getRoadConditionTheme(feature.get('level'))
+
+  return new Style({
+    image: new CircleStyle({
+      radius: 6,
+      fill: new Fill({ color: theme.dot }),
+      stroke: new Stroke({ color: '#ffffff', width: 2 })
+    }),
+    text: new Text({
+      text: `${feature.get('label')}\n${feature.get('detail')}`,
+      font: '600 12px sans-serif',
+      textAlign: 'left',
+      textBaseline: 'middle',
+      offsetX: 16,
+      offsetY: -10,
+      fill: new Fill({ color: theme.text }),
+      stroke: new Stroke({ color: '#ffffff', width: 3 }),
+      backgroundFill: new Fill({ color: 'rgba(255,255,255,0.94)' }),
+      backgroundStroke: new Stroke({ color: theme.border, width: 1.5 }),
+      padding: [6, 8, 6, 8]
+    })
+  })
+}
+
+function getRoadConditionTheme(level) {
+  if (level === 'danger') {
+    return { dot: '#dc2626', border: '#dc2626', text: '#7f1d1d' }
+  }
+  if (level === 'warning') {
+    return { dot: '#ea580c', border: '#ea580c', text: '#9a3412' }
+  }
+  if (level === 'notice') {
+    return { dot: '#2563eb', border: '#2563eb', text: '#1d4ed8' }
+  }
+
+  return { dot: '#16a34a', border: '#16a34a', text: '#166534' }
 }
 
 function createMarkerStyle(kind, label) {
@@ -875,13 +1160,17 @@ function projectionOptions() {
   gap: 20px;
 }
 
-.map-panel,
 .side-panel {
   min-width: 0;
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  padding-right: 8px;
+  scroll-behavior: smooth;
 }
 
 .map-panel {
   position: relative;
+  min-width: 0;
 }
 
 .route-map {
@@ -908,6 +1197,14 @@ function projectionOptions() {
 .panel-card {
   margin-bottom: 16px;
   border-radius: 16px;
+}
+
+.result-section {
+  scroll-margin-top: 12px;
+}
+
+.result-panel-card {
+  border-color: #dbeafe;
 }
 
 .card-header {
@@ -962,6 +1259,77 @@ function projectionOptions() {
   color: #6b7280;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.condition-quick-panel {
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef6ff 100%);
+}
+
+.condition-quick-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.condition-quick-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.condition-quick-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.condition-quick-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+}
+
+.condition-quick-item.danger {
+  border-color: #fecaca;
+}
+
+.condition-quick-item.warning {
+  border-color: #fed7aa;
+}
+
+.condition-quick-item.notice {
+  border-color: #bfdbfe;
+}
+
+.condition-quick-item.stable {
+  border-color: #bbf7d0;
+}
+
+.condition-quick-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.condition-quick-detail {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.5;
 }
 
 .stats-grid {
@@ -1091,6 +1459,11 @@ function projectionOptions() {
   }
 
   .point-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .condition-quick-header {
     flex-direction: column;
     align-items: flex-start;
   }

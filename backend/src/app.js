@@ -18,6 +18,9 @@ const teamRoutes = require('./routes/team');
 const notificationRoutes = require('./routes/notification');
 const analysisRoutes = require('./routes/analysis');
 const bufferRoutes = require('./routes/buffer');
+const weatherRoutes = require('./routes/weather');
+const tripRoutes = require('./routes/trip');
+const roadConditionRoutes = require('./routes/roadCondition');
 
 const app = express();
 
@@ -55,6 +58,9 @@ app.use('/api/team', teamRoutes);
 app.use('/api/notification', notificationRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/buffer', bufferRoutes);
+app.use('/api/weather', weatherRoutes);
+app.use('/api/trip', tripRoutes);
+app.use('/api/road-condition', roadConditionRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

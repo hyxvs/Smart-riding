@@ -1,9 +1,31 @@
+/**
+ * 分析模块路由
+ * 提供服务范围分析（等时圈计算）和分析历史查询功能
+ */
 const express = require('express');
 const router = express.Router();
 const { query, transaction } = require('../config/database');
 const { auth, optionalAuth } = require('../middleware/auth');
 
-// 服务范围分析（等时圈计算）
+/**
+ * POST /analysis/isochrone
+ * 服务范围分析（等时圈计算）API
+ * 基于pgRouting的pgr_drivingDistance函数计算不同时间限制下的可达区域
+ * 并分析可达区域内的POI分布
+ *
+ * 请求参数：
+ * - startLng, startLat: 起点经纬度
+ * - timeLimits: 时间限制数组（分钟），默认 [5, 10, 15, 30]
+ * - mode: 出行模式，默认 'cycling'
+ *
+ * 返回数据：
+ * - startPoint: 起点坐标
+ * - results: 每个时间限制的分析结果数组
+ *   - timeLimit: 时间限制（分钟）
+ *   - isochrone: 等时圈几何（GeoJSON格式）
+ *   - poiCount: 等时圈内POI数量
+ *   - pois: POI列表（包含ID、名称、类别、位置、距离）
+ */
 router.post('/isochrone', optionalAuth, async (req, res) => {
   try {
     const startTime = Date.now();
@@ -17,6 +39,7 @@ router.post('/isochrone', optionalAuth, async (req, res) => {
       return res.status(400).json({ code: 400, message: '起点坐标不能为空' });
     }
 
+    // 构建起点几何对象（4326坐标系）
     const startPoint = `ST_SetSRID(ST_MakePoint(${startLng}, ${startLat}), 4326)`;
     const results = [];
 
@@ -58,7 +81,7 @@ router.post('/isochrone', optionalAuth, async (req, res) => {
           FROM road_vertices_pgr v
           JOIN driving_distance d ON v.id = d.node
         ),
-        -- 构建等时圈（使用Voronoi图和缓冲区）
+        -- 构建等时圈（使用凸包算法）
         isochrone_polygon AS (
           SELECT ST_ConvexHull(ST_Collect(the_geom)) as geom
           FROM reachable_vertices
@@ -129,7 +152,26 @@ router.post('/isochrone', optionalAuth, async (req, res) => {
   }
 });
 
-// 获取服务范围分析历史
+/**
+ * GET /analysis/isochrone/history
+ * 获取服务范围分析历史API
+ * 查询用户的等时圈分析记录
+ *
+ * 请求参数（查询参数）：
+ * - page: 页码，默认 1
+ * - limit: 每页数量，默认 10
+ *
+ * 返回数据：
+ * - list: 分析历史列表
+ *   - id: 分析ID
+ *   - time_limit: 时间限制（分钟）
+ *   - start_point: 起点坐标（GeoJSON格式）
+ *   - isochrone_geom: 等时圈几何（GeoJSON格式）
+ *   - calculation_time: 计算时间（毫秒）
+ *   - created_at: 创建时间
+ * - page: 当前页码
+ * - limit: 每页数量
+ */
 router.get('/isochrone/history', auth, async (req, res) => {
   try {
     const { page = 1, limit = 10 } = req.query;

@@ -4,7 +4,6 @@
       <div class="page-header road-header">
         <div>
           <h2>道路分析</h2>
-          <p>恢复完整道路图层、骑行道覆盖和选中道路高亮，不再只显示当前分页数据。</p>
         </div>
         <div class="header-actions">
           <el-button @click="focusAllRoads">定位全图层</el-button>

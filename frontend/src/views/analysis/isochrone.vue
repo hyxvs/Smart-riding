@@ -274,7 +274,7 @@ function selectResult(index) {
   previewHistoryItem.value = null
   refreshMap()
 }
-
+// 回显历史记录
 function previewHistory(item) {
   previewHistoryItem.value = item
   activeTab.value = 'history'
@@ -391,6 +391,8 @@ function buildHistoryLayer() {
 }
 
 function buildPoiLayer() {
+  // 只有在回显历史记录时才需要绘制POI，否则返回null
+  // ！activePois.value.length的作用是判断是否有POI需要绘制
   if (!activePois.value.length) {
     return null
   }
@@ -440,6 +442,7 @@ function formatKilometers(value) {
   if (Number.isNaN(distance)) {
     return '-'
   }
+  // isNaN() 方法用于判断一个值是否为 Not a Number (NaN)
   return `${distance.toFixed(2)} km`
 }
 
@@ -453,6 +456,11 @@ function goLogin() {
 
 function projectionOptions() {
   return {
+    // 数据投影为 WGS84，特征投影为 Web Mercator
+    // dataProjection: 'EPSG:4326' 表示 WGS84 投影
+    // featureProjection: 'EPSG:3857' 表示投影为 Web Mercator
+    // 为什么需要转换投影？因为 OpenLayers 默认使用 WGS84 投影，而 Web Mercator 投影在地图上显示更符合人类视觉习惯
+    // dataProjection的作用，为什么是dataProjection
     dataProjection: 'EPSG:4326',
     featureProjection: 'EPSG:3857'
   }
@@ -462,9 +470,17 @@ function hexToRgba(hex, alpha) {
   const normalized = hex.replace('#', '')
   const bigint = parseInt(normalized, 16)
   const r = (bigint >> 16) & 255
+  // 从十六进制颜色值中提取红色分量
+  // 16 位到 24 位为红色分量
   const g = (bigint >> 8) & 255
+  // 从十六进制颜色值中提取绿色分量
+  // 8 位到 16 位为绿色分量
   const b = bigint & 255
+  // 从十六进制颜色值中提取蓝色分量
+  // 0 位位为蓝色分量
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  // rgba() 函数用于创建 RGBA 颜色值
+  // rgba(红色分量, 绿色分量, 蓝色分量, 透明度)
 }
 </script>
 

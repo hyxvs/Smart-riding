@@ -199,7 +199,7 @@ const form = reactive({
   targetCoords: [...defaultCenter],
   distances: [100, 200, 500]
 })
-
+// 当前选中的分析结果
 const activeResult = computed(() => results.value[activeResultIndex.value] || null)
 const activePois = computed(() => activeResult.value?.pois || [])
 const selectedPoi = computed(() => pois.value.find(item => item.id === form.targetId) || null)
@@ -328,12 +328,12 @@ async function analyzeBuffer() {
     loading.value = false
   }
 }
-
+// 选择分析结果
 function selectResult(index) {
   activeResultIndex.value = index
   refreshMap()
 }
-
+// 点击POI时，将地图中心聚焦到该POI
 function focusPoi(poi) {
   const coords = poi?.location?.coordinates
   if (!coords || !mapPickerRef.value) {
