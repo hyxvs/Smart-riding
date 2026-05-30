@@ -30,6 +30,10 @@
           <el-icon :size="24"><UserFilled /></el-icon>
           <span>组队骑行</span>
         </div>
+        <div class="action-item" @click="goToSocial">
+          <el-icon :size="24"><ChatDotRound /></el-icon>
+          <span>社交广场</span>
+        </div>
       </div>
     </div>
     
@@ -112,6 +116,11 @@ function goToReport() {
 // 跳转到组队骑行页面
 function goToTeam() {
   router.push('/team')
+}
+
+// 跳转到社交广场页面
+function goToSocial() {
+  router.push('/social')
 }
 
 // 定位当前位置

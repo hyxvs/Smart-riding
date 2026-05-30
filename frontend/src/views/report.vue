@@ -65,6 +65,7 @@
               action="/api/upload"
               list-type="picture-card"
               :file-list="fileList"
+              :headers="uploadHeaders"
               :on-success="handleUploadSuccess"
               :on-remove="handleRemove"
               :limit="5"
@@ -169,6 +170,11 @@ import MapPicker from '@/components/MapPicker.vue'
 
 // 初始化用户store
 const userStore = useUserStore()
+
+// 上传请求头配置
+const uploadHeaders = {
+  Authorization: `Bearer ${localStorage.getItem('token') || ''}`
+}
 
 // 表单引用
 const formRef = ref(null)

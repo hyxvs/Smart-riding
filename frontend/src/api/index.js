@@ -103,7 +103,6 @@ export const adminApi = {
   handleReport: (id, data) => request.put(`/admin/reports/${id}`, data), // 处理上报
   getHeatmap: (params) => request.get('/admin/heatmap', { params }), // 获取热点图数据
   getDashboard: () => request.get('/admin/stats/dashboard'), // 获取仪表盘数据
-  getOpinion: (params) => request.get('/admin/opinion', { params }), // 获取舆情数据
   getDepts: () => request.get('/admin/depts') // 获取部门列表
 }
 

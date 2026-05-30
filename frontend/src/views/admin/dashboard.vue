@@ -78,7 +78,7 @@
       </div>
 
       <el-row :gutter="20" class="chart-row">
-        <el-col :xs="24" :lg="16">
+        <el-col :xs="24" :lg="8">
           <div class="chart-card">
             <div class="card-header">
               <div>
@@ -98,6 +98,56 @@
               </div>
             </div>
             <div ref="typeChartRef" class="chart-container"></div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :lg="8">
+          <div class="chart-card">
+            <div class="card-header">
+              <div>
+                <h3>用户角色统计</h3>
+                <p>按角色统计用户数量分布。</p>
+              </div>
+            </div>
+            <div ref="userRoleChartRef" class="chart-container"></div>
+          </div>
+        </el-col>
+      </el-row>
+
+      <el-row :gutter="20" class="chart-row">
+        <el-col :xs="24" :lg="16">
+          <div class="chart-card">
+            <div class="card-header">
+              <div>
+                <h3>POI 分类统计</h3>
+                <p>按分类统计 POI 数量分布。</p>
+              </div>
+            </div>
+            <div ref="poiChartRef" class="chart-container"></div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :lg="8">
+          <div class="stats-card">
+            <div class="stats-header">
+              <h3>综合统计</h3>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-value">{{ stats.users?.total || 0 }}</div>
+                <div class="stat-label">平台用户</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ stats.poi?.total || 0 }}</div>
+                <div class="stat-label">POI 资源</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ formatDistance(stats.roads?.total_length_km) }}</div>
+                <div class="stat-label">道路里程</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ stats.reports?.total || 0 }}</div>
+                <div class="stat-label">事件总数</div>
+              </div>
+            </div>
           </div>
         </el-col>
       </el-row>
@@ -199,9 +249,16 @@ const newUsers = ref([])
 
 const trendChartRef = ref(null)
 const typeChartRef = ref(null)
+const userRoleChartRef = ref(null)
+const poiChartRef = ref(null)
 
 let trendChart = null
 let typeChart = null
+let userRoleChart = null
+let poiChart = null
+
+const userRoleData = ref([])
+const poiCategoryData = ref([])
 
 const activeUserRate = computed(() => {
   const total = Number(stats.value.users?.total || 0)
@@ -226,6 +283,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize)
   trendChart?.dispose()
   typeChart?.dispose()
+  userRoleChart?.dispose()
+  poiChart?.dispose()
 })
 
 async function loadDashboard() {
@@ -236,6 +295,11 @@ async function loadDashboard() {
       stats.value = res.data
       trendData.value = res.data.reportTrend || []
       typeData.value = res.data.reportTypes || []
+      userRoleData.value = res.data.userRoleDistribution || [
+        { name: '普通用户', value: res.data.users?.total - res.data.users?.admin_count || 0 },
+        { name: '管理员', value: res.data.users?.admin_count || 0 }
+      ]
+      poiCategoryData.value = res.data.poiCategories || []
       pendingReports.value = res.data.pendingReports || []
       newUsers.value = res.data.newUsers || []
       nextTick(() => renderCharts())
@@ -254,68 +318,167 @@ function initCharts() {
   if (typeChartRef.value && !typeChart) {
     typeChart = echarts.init(typeChartRef.value)
   }
+  if (userRoleChartRef.value && !userRoleChart) {
+    userRoleChart = echarts.init(userRoleChartRef.value)
+  }
+  if (poiChartRef.value && !poiChart) {
+    poiChart = echarts.init(poiChartRef.value)
+  }
 }
 
 function renderCharts() {
-  if (trendChart) {
-    trendChart.setOption({
-      color: ['#1f9d55'],
-      tooltip: { trigger: 'axis' },
-      grid: { left: 42, right: 20, top: 30, bottom: 30 },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: trendData.value.map(item => item.label),
-        axisLine: { lineStyle: { color: '#d9e2ec' } }
-      },
-      yAxis: {
-        type: 'value',
-        minInterval: 1,
-        axisLine: { show: false },
-        splitLine: { lineStyle: { color: '#eef2f7' } }
-      },
-      series: [{
-        name: '事件数',
-        type: 'line',
-        smooth: true,
-        data: trendData.value.map(item => item.count),
-        areaStyle: {
-          color: 'rgba(31, 157, 85, 0.12)'
-        },
-        lineStyle: {
-          width: 3
-        },
-        itemStyle: {
-          color: '#1f9d55'
-        }
-      }]
-    })
-  }
+  renderTrendChart()
+  renderTypeChart()
+  renderUserRoleChart()
+  renderPoiChart()
+}
 
-  if (typeChart) {
-    const pieData = typeData.value.length
-      ? typeData.value.map(item => ({ name: item.name, value: item.value }))
-      : [{ name: '暂无数据', value: 1, itemStyle: { color: '#d6dee6' } }]
+function renderTrendChart() {
+  if (!trendChart) return
 
-    typeChart.setOption({
-      tooltip: { trigger: 'item' },
-      color: ['#f97316', '#2563eb', '#14b8a6', '#ef4444', '#0f766e', '#84cc16'],
-      series: [{
-        type: 'pie',
-        radius: ['42%', '68%'],
-        center: ['50%', '54%'],
-        label: {
-          formatter: '{b}\n{d}%'
-        },
-        data: pieData
-      }]
-    })
-  }
+  trendChart.setOption({
+    color: ['#1f9d55'],
+    tooltip: { trigger: 'axis' },
+    grid: { left: 42, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: trendData.value.map(item => item.label),
+      axisLine: { lineStyle: { color: '#d9e2ec' } }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: '#eef2f7' } }
+    },
+    series: [{
+      name: '事件数',
+      type: 'line',
+      smooth: true,
+      data: trendData.value.map(item => item.count),
+      areaStyle: {
+        color: 'rgba(31, 157, 85, 0.12)'
+      },
+      lineStyle: {
+        width: 3
+      },
+      itemStyle: {
+        color: '#1f9d55'
+      }
+    }]
+  })
+}
+
+function renderTypeChart() {
+  if (!typeChart) return
+
+  const pieData = typeData.value.length
+    ? typeData.value.map(item => ({ name: item.name, value: item.value }))
+    : [{ name: '暂无数据', value: 1, itemStyle: { color: '#d6dee6' } }]
+
+  typeChart.setOption({
+    tooltip: { trigger: 'item' },
+    color: ['#f97316', '#2563eb', '#14b8a6', '#ef4444', '#0f766e', '#84cc16'],
+    series: [{
+      type: 'pie',
+      radius: ['42%', '68%'],
+      center: ['50%', '54%'],
+      label: {
+        formatter: '{b}\n{d}%'
+      },
+      data: pieData
+    }]
+  })
+}
+
+function renderUserRoleChart() {
+  if (!userRoleChart) return
+
+  const data = userRoleData.value.length
+    ? userRoleData.value
+    : [
+        { name: '普通用户', value: 0 },
+        { name: '管理员', value: 0 }
+      ]
+
+  userRoleChart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: data.map(item => item.name),
+      axisLine: { lineStyle: { color: '#d9e2ec' } }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: '#eef2f7' } }
+    },
+    series: [{
+      name: '用户数',
+      type: 'bar',
+      barWidth: '50%',
+      data: data.map(item => item.value),
+      itemStyle: {
+        borderRadius: [6, 6, 0, 0],
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#3b82f6' },
+          { offset: 1, color: '#93c5fd' }
+        ])
+      }
+    }]
+  })
+}
+
+function renderPoiChart() {
+  if (!poiChart) return
+
+  const data = poiCategoryData.value.length
+    ? poiCategoryData.value
+    : Array.from({ length: 6 }, (_, i) => ({
+        label: `分类${i + 1}`,
+        count: 0
+      }))
+
+  poiChart.setOption({
+    color: ['#8b5cf6'],
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: data.map(item => item.label || item.name),
+      axisLine: { lineStyle: { color: '#d9e2ec' } },
+      axisLabel: { rotate: 30 }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: '#eef2f7' } }
+    },
+    series: [{
+      name: 'POI数',
+      type: 'bar',
+      barWidth: '50%',
+      data: data.map(item => item.count || item.value),
+      itemStyle: {
+        borderRadius: [6, 6, 0, 0],
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#8b5cf6' },
+          { offset: 1, color: '#c4b5fd' }
+        ])
+      }
+    }]
+  })
 }
 
 function handleResize() {
   trendChart?.resize()
   typeChart?.resize()
+  userRoleChart?.resize()
+  poiChart?.resize()
 }
 
 function formatDate(value) {
@@ -386,11 +549,54 @@ function getReportStatusText(status) {
 .metric-card,
 .chart-card,
 .list-card,
-.summary-strip {
+.summary-strip,
+.stats-card {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(226, 232, 240, 0.9);
   border-radius: 20px;
   box-shadow: 0 14px 35px rgba(15, 23, 42, 0.06);
+}
+
+.stats-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-header {
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 16px;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  flex: 1;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 16px 12px;
+  background: #f8fafc;
+  border-radius: 12px;
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .stat-label {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+  }
 }
 
 .metric-card {

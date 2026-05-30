@@ -11,6 +11,70 @@
         </div>
       </div>
 
+      <el-row :gutter="20" class="chart-section">
+        <el-col :xs="24" :lg="12">
+          <div class="chart-card">
+            <div class="card-header">
+              <div>
+                <h3>道路类型分布</h3>
+                <p>按道路类型统计数量</p>
+              </div>
+            </div>
+            <div ref="typeChartRef" class="chart-container"></div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :lg="12">
+          <div class="chart-card">
+            <div class="card-header">
+              <div>
+                <h3>道路长度统计</h3>
+                <p>各类型道路总长度分布</p>
+              </div>
+            </div>
+            <div ref="lengthChartRef" class="chart-container"></div>
+          </div>
+        </el-col>
+      </el-row>
+
+      <el-row :gutter="20" class="chart-section">
+        <el-col :xs="24" :lg="16">
+          <div class="chart-card">
+            <div class="card-header">
+              <div>
+                <h3>坡度分布统计</h3>
+                <p>道路坡度区间分布</p>
+              </div>
+            </div>
+            <div ref="slopeChartRef" class="chart-container"></div>
+          </div>
+        </el-col>
+        <el-col :xs="24" :lg="8">
+          <div class="stats-card">
+            <div class="stats-header">
+              <h3>道路分析统计</h3>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-value">{{ roadStats.total || 0 }}</div>
+                <div class="stat-label">道路总数</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ roadStats.bike_lane_count || 0 }}</div>
+                <div class="stat-label">骑行道数量</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ formatLength(roadStats.total_length_km) }}</div>
+                <div class="stat-label">总里程(km)</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">{{ mapSummary.rendered }}</div>
+                <div class="stat-label">已加载道路</div>
+              </div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+
       <div class="stats-row">
         <div class="stat-card">
           <div class="stat-value">{{ roadStats.total || 0 }}</div>
@@ -195,6 +259,8 @@ import VectorLayer from 'ol/layer/Vector'
 import VectorSource from 'ol/source/Vector'
 import Feature from 'ol/Feature'
 import { Stroke, Style } from 'ol/style'
+import * as echarts from 'echarts'
+import dayjs from 'dayjs'
 
 const MAP_BATCH_LIMIT = 2000
 const MAP_MAX_PAGES = 3
@@ -231,12 +297,28 @@ let roadLayer = null
 let bikeLaneLayer = null
 let selectedRoadLayer = null
 
+const typeChartRef = ref(null)
+const lengthChartRef = ref(null)
+const slopeChartRef = ref(null)
+
+let typeChart = null
+let lengthChart = null
+let slopeChart = null
+
+const typeData = ref([])
+const lengthData = ref([])
+const slopeData = ref([])
+
 onMounted(() => {
   loadRoads()
+  nextTick(() => initCharts())
 })
 
 onBeforeUnmount(() => {
   clearRoadLayers()
+  typeChart?.dispose()
+  lengthChart?.dispose()
+  slopeChart?.dispose()
 })
 
 async function loadRoads(nextPage = page.value) {
@@ -264,6 +346,7 @@ async function loadRoads(nextPage = page.value) {
       roads.value = listRes.data.roads || []
       total.value = listRes.data.total || 0
       roadStats.value = listRes.data.stats || { total: 0, bike_lane_count: 0, total_length_km: 0 }
+      processChartData(listRes.data.roads || [])
     }
 
     mapRoads.value = mapData.roads
@@ -272,6 +355,7 @@ async function loadRoads(nextPage = page.value) {
 
     await nextTick()
     renderRoadLayers({ fitToExtent: true })
+    renderCharts()
   } catch (error) {
     console.error('加载道路数据失败:', error)
   } finally {
@@ -534,6 +618,162 @@ function formatSlope(value) {
   if (value === null || value === undefined || value === '') return '--'
   return `${Number(value).toFixed(2)}%`
 }
+
+function initCharts() {
+  if (typeChartRef.value && !typeChart) {
+    typeChart = echarts.init(typeChartRef.value)
+  }
+  if (lengthChartRef.value && !lengthChart) {
+    lengthChart = echarts.init(lengthChartRef.value)
+  }
+  if (slopeChartRef.value && !slopeChart) {
+    slopeChart = echarts.init(slopeChartRef.value)
+  }
+  window.addEventListener('resize', handleChartsResize)
+}
+
+function renderCharts() {
+  renderTypeChart()
+  renderLengthChart()
+  renderSlopeChart()
+}
+
+function renderTypeChart() {
+  if (!typeChart) return
+  const data = typeData.value.length
+    ? typeData.value.map(item => ({ name: item.name, value: item.value }))
+    : [
+        { name: '主干道', value: 0 },
+        { name: '次干道', value: 0 },
+        { name: '支路', value: 0 }
+      ]
+
+  typeChart.setOption({
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+    color: ['#3b82f6', '#22c55e', '#f97316', '#8b5cf6', '#ec4899'],
+    series: [{
+      type: 'pie',
+      radius: ['40%', '70%'],
+      center: ['50%', '50%'],
+      label: { formatter: '{b}\n{d}%' },
+      data: data.length ? data : [{ name: '暂无数据', value: 1, itemStyle: { color: '#d6dee6' } }]
+    }]
+  })
+}
+
+function renderLengthChart() {
+  if (!lengthChart) return
+  const data = lengthData.value.length
+    ? lengthData.value
+    : Array.from({ length: 6 }, (_, i) => ({
+        label: `类型${i + 1}`,
+        count: 0
+      }))
+
+  lengthChart.setOption({
+    color: ['#3b82f6'],
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: data.map(item => item.label),
+      axisLine: { lineStyle: { color: '#d9e2ec' } },
+      axisLabel: { rotate: 30 }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 0.1,
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: '#eef2f7' } }
+    },
+    series: [{
+      name: '长度(km)',
+      type: 'bar',
+      barWidth: '50%',
+      data: data.map(item => item.count),
+      itemStyle: {
+        borderRadius: [6, 6, 0, 0],
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#22c55e' },
+          { offset: 1, color: '#86efac' }
+        ])
+      }
+    }]
+  })
+}
+
+function renderSlopeChart() {
+  if (!slopeChart) return
+  const data = slopeData.value.length
+    ? slopeData.value
+    : [
+        { label: '0-2%', count: 0 },
+        { label: '2-5%', count: 0 },
+        { label: '5-8%', count: 0 },
+        { label: '8-10%', count: 0 },
+        { label: '>10%', count: 0 }
+      ]
+
+  slopeChart.setOption({
+    color: ['#8b5cf6'],
+    tooltip: { trigger: 'axis' },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: data.map(item => item.label),
+      axisLine: { lineStyle: { color: '#d9e2ec' } }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: '#eef2f7' } }
+    },
+    series: [{
+      name: '道路数',
+      type: 'line',
+      smooth: true,
+      data: data.map(item => item.count),
+      areaStyle: {
+        color: 'rgba(139, 92, 246, 0.12)'
+      },
+      lineStyle: { width: 3 },
+      itemStyle: { color: '#8b5cf6' }
+    }]
+  })
+}
+
+function handleChartsResize() {
+  typeChart?.resize()
+  lengthChart?.resize()
+  slopeChart?.resize()
+}
+
+function processChartData(roads) {
+  const typeMap = new Map()
+  const lengthMap = new Map()
+  const slopeMap = { '0-2%': 0, '2-5%': 0, '5-8%': 0, '8-10%': 0, '>10%': 0 }
+
+  roads.forEach(road => {
+    if (road.road_type) {
+      typeMap.set(road.road_type, (typeMap.get(road.road_type) || 0) + 1)
+      lengthMap.set(road.road_type, (lengthMap.get(road.road_type) || 0) + Number(road.length_km || 0))
+    }
+
+    if (road.avg_slope !== null && road.avg_slope !== undefined) {
+      const slope = Number(road.avg_slope)
+      if (slope <= 2) slopeMap['0-2%']++
+      else if (slope <= 5) slopeMap['2-5%']++
+      else if (slope <= 8) slopeMap['5-8%']++
+      else if (slope <= 10) slopeMap['8-10%']++
+      else slopeMap['>10%']++
+    }
+  })
+
+  typeData.value = Array.from(typeMap.entries()).map(([name, value]) => ({ name, value }))
+  lengthData.value = Array.from(lengthMap.entries()).map(([label, count]) => ({ label, count: Number(count.toFixed(2)) }))
+  slopeData.value = Object.entries(slopeMap).map(([label, count]) => ({ label, count }))
+}
 </script>
 
 <style lang="scss" scoped>
@@ -598,6 +838,81 @@ function formatSlope(value) {
 .content-wrapper {
   display: flex;
   gap: 20px;
+}
+
+.chart-section {
+  margin-bottom: 20px;
+}
+
+.chart-card,
+.stats-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  padding: 20px;
+  height: 100%;
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-header {
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 16px;
+  }
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  flex: 1;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 12px;
+
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .stat-label {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #64748b;
+  }
+}
+
+.card-header {
+  margin-bottom: 16px;
+
+  h3 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 16px;
+  }
+
+  p {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 13px;
+  }
+}
+
+.chart-container {
+  height: 240px;
 }
 
 .map-card,

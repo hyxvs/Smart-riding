@@ -60,8 +60,12 @@ request.interceptors.request.use(
   config => {
     // 从本地存储获取token
     const token = localStorage.getItem("token")
+    console.log(`[REQUEST] ${config.method?.toUpperCase()} ${config.url}, token存在: ${!!token}`)
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
+      console.log(`[REQUEST] Authorization头已设置: ${token.substring(0, 20)}...`)
+    } else {
+      console.log(`[REQUEST] 没有token，可能未登录`)
     }
 
     // GET 请求尝试从缓存获取

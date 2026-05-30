@@ -23,6 +23,10 @@
           <el-icon><UserFilled /></el-icon>
           <span>组队骑行</span>
         </router-link>
+        <router-link to="/challenge" class="nav-item" :class="{ active: $route.path === '/challenge' }">
+          <el-icon><Trophy /></el-icon>
+          <span>骑行挑战</span>
+        </router-link>
         <router-link to="/analysis" class="nav-item" :class="{ active: $route.path === '/analysis' }">
           <el-icon><DataAnalysis /></el-icon>
           <span>民生分析</span>

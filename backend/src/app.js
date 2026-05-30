@@ -7,20 +7,26 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const db = require('./config/database');
-const authRoutes = require('./routes/auth');
-const userRoutes = require('./routes/user');
-const routeRoutes = require('./routes/route');
-const reportRoutes = require('./routes/report');
-const poiRoutes = require('./routes/poi');
-const aiRoutes = require('./routes/ai');
-const adminRoutes = require('./routes/admin');
-const teamRoutes = require('./routes/team');
-const notificationRoutes = require('./routes/notification');
-const analysisRoutes = require('./routes/analysis');
-const bufferRoutes = require('./routes/buffer');
-const weatherRoutes = require('./routes/weather');
-const tripRoutes = require('./routes/trip');
-const roadConditionRoutes = require('./routes/roadCondition');
+const authRoutes = require('./routes/core/auth');
+const userRoutes = require('./routes/core/user');
+const routeRoutes = require('./routes/core/route');
+const rideRoutes = require('./routes/core/ride');
+const gisRoutes = require('./routes/gis/gis');
+const bufferRoutes = require('./routes/gis/buffer');
+const analysisRoutes = require('./routes/gis/analysis');
+const socialRoutes = require('./routes/social/social');
+const challengeRoutes = require('./routes/social/challenge');
+const teamRoutes = require('./routes/social/team');
+const tripRoutes = require('./routes/trip/trip');
+const adminRoutes = require('./routes/system/admin');
+const weatherRoutes = require('./routes/system/weather');
+const uploadRoutes = require('./routes/system/upload');
+const poiRoutes = require('./routes/system/poi');
+const equipmentRoutes = require('./routes/system/equipment');
+const notificationRoutes = require('./routes/system/notification');
+const reportRoutes = require('./routes/system/report');
+const aiRoutes = require('./routes/system/ai');
+const roadConditionRoutes = require('./routes/system/roadCondition');
 
 const app = express();
 
@@ -61,6 +67,12 @@ app.use('/api/buffer', bufferRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/trip', tripRoutes);
 app.use('/api/road-condition', roadConditionRoutes);
+app.use('/api/gis', gisRoutes);
+app.use('/api/equipment', equipmentRoutes);
+app.use('/api/social', socialRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/challenge', challengeRoutes);
+app.use('/api/ride', rideRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

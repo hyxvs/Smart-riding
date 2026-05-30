@@ -46,7 +46,6 @@
             <span>数据分析</span>
           </template>
           <el-menu-item index="/admin/heatmap">热点分析</el-menu-item>
-          <el-menu-item index="/admin/opinion">舆情监测</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="map-mgmt">

@@ -35,6 +35,18 @@ const routes = [
         meta: { title: '个人中心', requiresAuth: true } // 页面标题和认证要求
       },
       {
+        path: 'social',
+        name: 'Social',
+        component: () => import('@/views/social.vue'),
+        meta: { title: '社交广场' }
+      },
+      {
+        path: 'challenge',
+        name: 'Challenge',
+        component: () => import('@/views/challenge.vue'),
+        meta: { title: '骑行挑战' }
+      },
+      {
         path: 'analysis', // 空间分析路径
         name: 'Analysis', // 路由名称
         component: () => import('@/layouts/AnalysisLayout.vue'), // 分析布局组件
@@ -58,6 +70,12 @@ const routes = [
             name: 'AnalysisRoute', // 路由名称
             component: () => import('@/views/analysis/route.vue'), // 路线分析组件
             meta: { title: '路线分析' } // 页面标题
+          },
+          {
+            path: 'gis', // GIS高级分析路径
+            name: 'GisAnalysis', // 路由名称
+            component: () => import('@/views/analysis/gis.vue'), // GIS分析组件
+            meta: { title: 'GIS空间分析' } // 页面标题
           }
         ]
       }
@@ -92,12 +110,6 @@ const routes = [
         name: 'AdminHeatmap', // 路由名称
         component: () => import('@/views/admin/heatmap.vue'), // 热点分析组件
         meta: { title: '热点分析' } // 页面标题
-      },
-      {
-        path: 'opinion', // 舆情监测路径
-        name: 'AdminOpinion', // 路由名称
-        component: () => import('@/views/admin/opinion.vue'), // 舆情监测组件
-        meta: { title: '舆情监测' } // 页面标题
       },
       {
         path: 'poi', // POI管理路径
