@@ -53,3 +53,11 @@ data/*.tif
 data/*.geojson
 data/*.qmd
 data/*.aux.xml
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+Dockerfile.local
+
+# 上传文件
+uploads/
