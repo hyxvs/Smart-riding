@@ -82,24 +82,74 @@ flowchart TD
 │   │   ├── stores/    # Pinia状态管理
 │   │   ├── styles/    # 全局样式
 │   │   └── views/     # 页面组件
+│   ├── Dockerfile     # 前端Docker构建文件
 │   └── package.json
 ├── backend/           # Node.js后端项目
 │   ├── src/
 │   │   ├── config/    # 配置文件
 │   │   ├── middleware/# 中间件
 │   │   └── routes/    # API路由
+│   ├── Dockerfile     # 后端Docker构建文件
 │   └── package.json
 ├── database/          # 数据库脚本
-│   └── init.sql       # 初始化SQL
+│   └── 01_init.sql    # 初始化SQL
 ├── data/              # 地理数据
 │   ├── ganzhou_roads.geojson
 │   └── 章贡区.tif
+├── docker-compose.yml # Docker Compose编排文件
 └── README.md          # 项目文档
 ```
 
 ## 快速开始
 
-### 1. 环境要求
+### 🚀 方式一：Docker 一键部署（推荐）
+
+**环境要求**：只需安装 Docker Desktop
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/hyxvs/Smart-riding.git
+cd Smart-riding
+
+# 2. 启动所有服务（自动构建镜像）
+docker-compose up -d
+
+# 3. 等待服务启动（约30秒），然后访问
+# 前端地址: http://localhost
+# 后端API: http://localhost:3002
+# 默认管理员: admin / 123456
+```
+
+**服务列表**：
+
+| 服务 | 容器名称 | 端口 | 说明 |
+|------|----------|------|------|
+| PostgreSQL + PostGIS | cycling_db | 5432 | 空间数据库 |
+| 后端 API | cycling_backend | 3002 | Node.js 服务 |
+| 前端 | cycling_frontend | 80 | Vue 应用 |
+
+**常用命令**：
+
+```bash
+# 查看所有容器状态
+docker-compose ps
+
+# 查看服务日志
+docker-compose logs -f backend
+
+# 停止服务
+docker-compose down
+
+# 停止并删除数据卷（重置数据库）
+docker-compose down -v
+
+# 重新构建并启动
+docker-compose up -d --build
+```
+
+### 🛠️ 方式二：本地开发环境
+
+#### 1. 环境要求
 
 - Node.js >= 18
 - PostgreSQL >= 14 + PostGIS >= 3
@@ -159,10 +209,10 @@ npm run dev
 npm run dev
 ```
 
-### 6. 访问应用
+#### 6. 访问应用
 
 - 前端地址: http://localhost:5173
-- 后端API: http://localhost:3000
+- 后端API: http://localhost:3002
 - 默认管理员: admin / 123456
 
 ## 功能模块
@@ -263,19 +313,67 @@ npm run dev
 
 ## 部署说明
 
-### 前端构建
+### 🐳 Docker 部署（推荐）
+
+项目已配置完整的 Docker 环境，使用 `docker-compose.yml` 一键部署：
+
+```bash
+# 克隆项目
+git clone https://github.com/hyxvs/Smart-riding.git
+cd Smart-riding
+
+# 启动所有服务
+docker-compose up -d
+
+# 查看服务状态
+docker-compose ps
+```
+
+**部署架构**：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Docker 宿主机                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │   Nginx      │  │   Node.js    │  │ PostgreSQL   │     │
+│  │  (前端静态)   │  │   (后端API)   │  │  + PostGIS   │     │
+│  │   :80        │  │   :3002      │  │   :5432      │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+│         │                 │                 │              │
+│         └─────────────────┴─────────────────┘              │
+│                      内部网络                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**环境变量配置**：
+
+在 `docker-compose.yml` 中可配置以下环境变量：
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| POSTGRES_DB | cycling_smart | 数据库名 |
+| POSTGRES_USER | postgres | 数据库用户名 |
+| POSTGRES_PASSWORD | 123456 | 数据库密码 |
+| DB_HOST | postgres | 数据库主机 |
+| PORT | 3002 | 后端端口 |
+
+### 📦 手动部署
+
+#### 前端构建
 ```bash
 cd frontend
+npm install
 npm run build
 ```
 
-### 后端部署
+#### 后端部署
 ```bash
 cd backend
+npm install
 npm start
 ```
 
-### Nginx配置示例
+#### Nginx配置示例
 ```nginx
 server {
     listen 80;
@@ -287,7 +385,7 @@ server {
     }
     
     location /api {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://localhost:3002;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -319,6 +417,10 @@ server {
 - Requests
 - psycopg2
 - schedule 定时任务
+
+### 容器化
+- Docker + Docker Compose
+- Nginx (前端静态服务)
 
 ## 贡献指南
 
