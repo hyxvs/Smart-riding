@@ -100,9 +100,9 @@ const startServer = async () => {
     console.log('✅ 数据库连接成功');
     
     console.log(`正在启动服务器，端口: ${PORT}...`);
-    const server = app.listen(PORT, '127.0.0.1', () => {
-      console.log(`🚀 服务器运行在 http://127.0.0.1:${PORT}`);
-      console.log(`📚 API文档: http://127.0.0.1:${PORT}/api/health`);
+    const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 服务器运行在 http://0.0.0.0:${PORT}`);
+      console.log(`📚 API文档: http://localhost:${PORT}/api/health`);
       console.log('✅ 服务器启动成功');
     });
     

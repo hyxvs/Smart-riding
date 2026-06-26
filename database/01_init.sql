@@ -7,7 +7,22 @@
 
 -- 启用必要的扩展
 CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS pgRouting;
+
+-- pgRouting 扩展可选（需要额外安装）
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgrouting') THEN
+        RAISE NOTICE 'pgRouting extension already exists';
+    ELSE
+        BEGIN
+            CREATE EXTENSION pgRouting;
+            RAISE NOTICE 'pgRouting extension created';
+        EXCEPTION
+            WHEN OTHERS THEN
+                RAISE NOTICE 'pgRouting extension not available, skipping';
+        END;
+    END IF;
+END $$;
 
 -- =============================================
 -- 一、基础空间层

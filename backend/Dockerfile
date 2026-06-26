@@ -2,9 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-RUN npm ci --only=production
+RUN npm config set registry https://registry.npmmirror.com && npm install --only=production
 
 COPY . .
 
